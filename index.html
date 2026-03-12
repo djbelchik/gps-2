@@ -313,78 +313,135 @@
             // Удаляем старую линию
             if (polyline) polyline.setMap(null);
 
+            if (locations.length === 0) return;
+
+            // Сортируем по count чтобы был правильный порядок
+            locations.sort((a, b) => a.count - b.count);
+
             // Координаты для полилинии
             const path = locations.map(loc => ({
                 lat: loc.lat,
                 lng: loc.lon
             }));
 
-            // Рисуем маршрут
+            // Рисуем линию с градиентом (красный → зелёный) и стрелками
             if (path.length > 1) {
-                polyline = new google.maps.Polyline({
-                    path: path,
-                    geodesic: true,
-                    strokeColor: '#667eea',
-                    strokeOpacity: 0.7,
-                    strokeWeight: 3,
-                    map: map
-                });
+                // Разбиваем на сегменты и рисуем с разными цветами
+                for (let i = 0; i < path.length - 1; i++) {
+                    // Градиент: от красного (0) к зеленому (1)
+                    const progress = i / (path.length - 1);
+                    let color;
+                    
+                    if (progress < 0.5) {
+                        // Красный → Жёлтый
+                        const ratio = progress * 2;
+                        const r = 255;
+                        const g = Math.round(255 * ratio);
+                        const b = 0;
+                        color = `rgb(${r}, ${g}, ${b})`;
+                    } else {
+                        // Жёлтый → Зелёный
+                        const ratio = (progress - 0.5) * 2;
+                        const r = Math.round(255 * (1 - ratio));
+                        const g = 255;
+                        const b = 0;
+                        color = `rgb(${r}, ${g}, ${b})`;
+                    }
+
+                    const segment = new google.maps.Polyline({
+                        path: [path[i], path[i + 1]],
+                        geodesic: true,
+                        strokeColor: color,
+                        strokeOpacity: 0.8,
+                        strokeWeight: 4,
+                        map: map
+                    });
+
+                    // Добавляем стрелку в середину сегмента
+                    if (i % 5 === 0) { // Каждая 5-я стрелка (чтобы не переполнить)
+                        const arrowMid = {
+                            lat: (path[i].lat + path[i + 1].lat) / 2,
+                            lng: (path[i].lng + path[i + 1].lng) / 2
+                        };
+
+                        const arrowAngle = google.maps.geometry.spherical.computeHeading(path[i], path[i + 1]);
+
+                        const arrow = new google.maps.Marker({
+                            position: arrowMid,
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                scale: 5,
+                                fillColor: color,
+                                fillOpacity: 0.8,
+                                strokeColor: 'white',
+                                strokeWeight: 1,
+                                rotation: arrowAngle
+                            },
+                            title: `Направление`
+                        });
+
+                        markers.push(arrow);
+                    }
+                }
             }
 
-            // Добавляем маркеры
-            locations.forEach((loc, index) => {
-                const color = index === locations.length - 1 ? '#4CAF50' : '#667eea';
-
-                const marker = new google.maps.Marker({
-                    position: {lat: loc.lat, lng: loc.lon},
+            // Маркер НАЧАЛА (красный большой) 🟢 СТАРТ
+            if (locations.length > 0) {
+                const startLoc = locations[0];
+                const startMarker = new google.maps.Marker({
+                    position: {lat: startLoc.lat, lng: startLoc.lon},
                     map: map,
-                    title: `Точка ${loc.count}`,
-                    label: {
-                        text: String(loc.count),
-                        color: 'white',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                    },
+                    title: `🟢 СТАРТ`,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: color,
-                        fillOpacity: 0.8,
+                        scale: 12,
+                        fillColor: '#FF0000',
+                        fillOpacity: 1,
                         strokeColor: 'white',
-                        strokeWeight: 2
+                        strokeWeight: 3
+                    },
+                    label: {
+                        text: 'СТАРТ',
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
                     }
                 });
+                markers.push(startMarker);
+            }
 
-                markers.push(marker);
-
-                // Информационное окно
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="font-family: Arial; font-size: 12px;">
-                            <strong>Точка ${loc.count}</strong><br>
-                            Lat: ${loc.lat.toFixed(6)}<br>
-                            Lon: ${loc.lon.toFixed(6)}<br>
-                            Время: ${loc.time}
-                        </div>
-                    `
-                });
-
-                marker.addListener('click', () => {
-                    infoWindow.open(map, marker);
-                });
-            });
-
-            // Центрируем карту на последней точке
+            // Маркер КОНЦА (зелёный большой) 🏁 ФИНИШ
             if (locations.length > 0) {
-                const lastLoc = locations[locations.length - 1];
-                map.setCenter({lat: lastLoc.lat, lng: lastLoc.lon});
-                
-                // Автоматически подбираем zoom
-                if (locations.length > 1) {
-                    const bounds = new google.maps.LatLngBounds();
-                    path.forEach(point => bounds.extend(point));
-                    map.fitBounds(bounds);
-                }
+                const endLoc = locations[locations.length - 1];
+                const endMarker = new google.maps.Marker({
+                    position: {lat: endLoc.lat, lng: endLoc.lon},
+                    map: map,
+                    title: `🏁 ФИНИШ`,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: '#00FF00',
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 3
+                    },
+                    label: {
+                        text: 'ФИНИШ',
+                        color: 'black',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    }
+                });
+                markers.push(endMarker);
+            }
+
+            // Центрируем карту на маршруте
+            if (locations.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                path.forEach(point => bounds.extend(point));
+                map.fitBounds(bounds);
+                map.setZoom(Math.max(map.getZoom() - 1, 12)); // Немного отдалим
             }
         }
 
