@@ -160,8 +160,7 @@
         function renderTripsList() {
             const html = trips.map(trip => `
                 <div class="trip-item ${trip === currentTrip ? 'active' : ''}" onclick="loadTrip('${trip}')">
-                    <strong>${trip.split('_')[0]}</strong><br>
-                    <small>Поездка ${trip.split('_')[1]}</small>
+                    <strong>Поездка ${trip}</strong>
                 </div>
             `).join('');
             
