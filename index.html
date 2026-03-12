@@ -144,7 +144,7 @@
                         return;
                     }
 
-                    trips = Object.keys(data).sort().reverse();
+                    trips = Object.keys(data).sort((a, b) => parseInt(b) - parseInt(a)); // Сортируем по убыванию
                     renderTripsList();
                     
                     if (trips.length > 0) {
@@ -159,12 +159,33 @@
 
         function renderTripsList() {
             const html = trips.map(trip => `
-                <div class="trip-item ${trip === currentTrip ? 'active' : ''}" onclick="loadTrip('${trip}')">
-                    <strong>Поездка ${trip}</strong>
+                <div class="trip-item ${trip === currentTrip ? 'active' : ''}" onclick="loadTrip('${trip}')" id="trip-${trip}">
+                    <strong>Поездка ${trip}</strong><br>
+                    <small id="date-${trip}">Загрузка...</small>
                 </div>
             `).join('');
             
             document.getElementById('tripsList').innerHTML = html;
+            
+            // Загружаем даты для каждой поездки
+            trips.forEach(trip => {
+                loadTripDate(trip);
+            });
+        }
+
+        function loadTripDate(tripID) {
+            const url = `${FIREBASE_URL}/${CAR_ID}/trips/${tripID}/meta.json?auth=${FIREBASE_AUTH}`;
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.date) {
+                        document.getElementById(`date-${tripID}`).textContent = data.date;
+                    }
+                })
+                .catch(e => {
+                    document.getElementById(`date-${tripID}`).textContent = 'Нет даты';
+                });
         }
 
         function loadTrip(tripID) {
@@ -187,7 +208,8 @@
                                 num: num,
                                 lat: parseFloat(data[key].lat),
                                 lon: parseFloat(data[key].lon),
-                                time: data[key].time
+                                time: data[key].time || '-',
+                                date: data[key].date || '-'
                             });
                         }
                     }
@@ -262,11 +284,15 @@
                 );
             }
 
+            const startTime = points[0].time || '-';
+            const endTime = points[points.length-1].time || '-';
+            const startDate = points[0].date || '-';
+
             const html = `
+                <div><strong>📅 Дата:</strong> ${startDate}</div>
+                <div><strong>🕐 Время:</strong> ${startTime} → ${endTime}</div>
                 <div><strong>📍 Точек:</strong> ${points.length}</div>
                 <div><strong>🛣️ Км:</strong> ${(distance/1000).toFixed(1)}</div>
-                <div><strong>⏱️ Старт:</strong> ${points[0].time || '-'}</div>
-                <div><strong>🏁 Финиш:</strong> ${points[points.length-1].time || '-'}</div>
             `;
             
             document.getElementById('tripInfo').innerHTML = html;
